@@ -121,7 +121,7 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
                 }
 
                 int removedEntries = 0;
-                for (int i=1; i<strArgs.size(); i++) {
+                for (int i = 1; i < strArgs.size(); i++) {
                     final String key = strArgs.get(i);
                     if (key == null) {
                         continue;
