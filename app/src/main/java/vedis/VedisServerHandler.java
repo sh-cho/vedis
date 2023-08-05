@@ -1,12 +1,11 @@
 package vedis;
 
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.redis.ArrayRedisMessage;
-import io.netty.handler.codec.redis.ErrorRedisMessage;
-import io.netty.handler.codec.redis.FullBulkStringRedisMessage;
-import io.netty.handler.codec.redis.RedisMessage;
+import io.netty.handler.codec.redis.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -50,6 +49,8 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
                     .toList();
 
         final String command = strArgs.get(0);
+        System.err.println(ctx.channel() + " RCVD: " + strArgs);
+
         switch (command) {
             case "COMMAND":  // dummy response
                 ctx.writeAndFlush(ArrayRedisMessage.EMPTY_INSTANCE);
@@ -60,11 +61,15 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
             case "SET":
                 ctx.writeAndFlush(new FullBulkStringRedisMessage(Unpooled.copiedBuffer("wow", StandardCharsets.UTF_8)));
                 break;
+            case "SHUTDOWN":
+                ctx.writeAndFlush(new SimpleStringRedisMessage("OK"))
+                   .addListener((ChannelFutureListener) f -> {
+                       f.channel().close();
+                       shutdownLatch.countDown();
+                   });
             default:
                 reject(ctx, "ERR Unsupported command");
         }
-
-        System.err.println(ctx.channel() + " RCVD: " + strArgs);
     }
 
     private void rejectMalformedRequest(final ChannelHandlerContext ctx) {

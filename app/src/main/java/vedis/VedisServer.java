@@ -42,6 +42,7 @@ public class VedisServer {
 
             // wait until the latch becomes zero
             shutdownLatch.await();
+            System.err.println("Received a SHUTDOWN command; shtting down..");
         } finally {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
