@@ -1,5 +1,6 @@
 package vedis;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.redis.ArrayRedisMessage;
@@ -53,7 +54,12 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
             case "COMMAND":  // dummy response
                 ctx.writeAndFlush(ArrayRedisMessage.EMPTY_INSTANCE);
                 break;
-
+            case "GET":
+                ctx.writeAndFlush(new FullBulkStringRedisMessage(Unpooled.copiedBuffer("hi!", StandardCharsets.UTF_8)));
+                break;
+            case "SET":
+                ctx.writeAndFlush(new FullBulkStringRedisMessage(Unpooled.copiedBuffer("wow", StandardCharsets.UTF_8)));
+                break;
             default:
                 reject(ctx, "ERR Unsupported command");
         }
