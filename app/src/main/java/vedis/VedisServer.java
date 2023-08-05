@@ -10,6 +10,8 @@ import io.netty.handler.codec.redis.RedisBulkStringAggregator;
 import io.netty.handler.codec.redis.RedisDecoder;
 import io.netty.handler.codec.redis.RedisEncoder;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 
 public class VedisServer {
@@ -22,6 +24,9 @@ public class VedisServer {
 
         // it becomes zero when received `shutdown` command
         final CountDownLatch shutdownLatch = new CountDownLatch(1);
+
+        final ConcurrentMap<String, String> map = new ConcurrentHashMap<>();
+
         try {
             final ServerBootstrap b = new ServerBootstrap();
             b.channel(NioServerSocketChannel.class);
@@ -34,7 +39,7 @@ public class VedisServer {
                     p.addLast(new RedisBulkStringAggregator());
                     p.addLast(new RedisArrayAggregator());
                     p.addLast(new RedisEncoder());
-                    p.addLast(new VedisServerHandler(shutdownLatch));
+                    p.addLast(new VedisServerHandler(map, shutdownLatch));
                 }
             });
             final Channel ch = b.bind(PORT).sync().channel();

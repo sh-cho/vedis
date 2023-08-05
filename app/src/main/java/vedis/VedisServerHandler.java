@@ -11,13 +11,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 
 public class VedisServerHandler extends ChannelInboundHandlerAdapter {
 
+    private final ConcurrentMap<String, String> map;
     private final CountDownLatch shutdownLatch;
 
-    VedisServerHandler(CountDownLatch shutdownLatch) {
+    VedisServerHandler(ConcurrentMap<String, String> map, CountDownLatch shutdownLatch) {
+        this.map = map;
         this.shutdownLatch = shutdownLatch;
     }
 
@@ -55,12 +58,82 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
             case "COMMAND":  // dummy response
                 ctx.writeAndFlush(ArrayRedisMessage.EMPTY_INSTANCE);
                 break;
-            case "GET":
-                ctx.writeAndFlush(new FullBulkStringRedisMessage(Unpooled.copiedBuffer("hi!", StandardCharsets.UTF_8)));
+            case "GET": {
+                if (strArgs.size() < 2) {
+                    reject(ctx, "ERR GET command requires a key argument");
+                    return;
+                }
+                final String key = strArgs.get(1);
+                if (key == null) {
+                    rejectNilKey(ctx);
+                    return;
+                }
+
+                final String value = map.get(key);
+                final FullBulkStringRedisMessage reply;
+                if (value != null) {
+                    reply = new FullBulkStringRedisMessage(
+                            Unpooled.copiedBuffer(value, StandardCharsets.UTF_8));
+                } else {
+                    reply = FullBulkStringRedisMessage.NULL_INSTANCE;
+                }
+                ctx.writeAndFlush(reply);
                 break;
-            case "SET":
-                ctx.writeAndFlush(new FullBulkStringRedisMessage(Unpooled.copiedBuffer("wow", StandardCharsets.UTF_8)));
+            }
+            case "SET": {
+                if (strArgs.size() < 3) {
+                    reject(ctx, "ERR SET command requires a key, value argument");
+                    return;
+                }
+                final String key = strArgs.get(1);
+                if (key == null) {
+                    rejectNilKey(ctx);
+                    return;
+                }
+                final String value = strArgs.get(2);
+                if (value == null) {
+                    rejectNilValue(ctx);
+                    return;
+                }
+
+                // naive version
+                final boolean shouldReplyOldValue = strArgs.size() > 3 && "GET".equals(strArgs.get(3));
+                final String oldValue = map.put(key, value);
+                final RedisMessage reply;
+                if (shouldReplyOldValue) {
+                    if (oldValue != null) {
+                        reply = new FullBulkStringRedisMessage(
+                                Unpooled.copiedBuffer(oldValue, StandardCharsets.UTF_8));
+                    } else {
+                        reply = FullBulkStringRedisMessage.NULL_INSTANCE;
+                    }
+                } else {
+                    reply = new SimpleStringRedisMessage("OK");
+                }
+
+                ctx.writeAndFlush(reply);
                 break;
+            }
+            case "DEL": {
+                if (strArgs.size() < 2) {
+                    reject(ctx, "ERR DEL command requires at least one key argument");
+                    return;
+                }
+
+                int removedEntries = 0;
+                for (int i=1; i<strArgs.size(); i++) {
+                    final String key = strArgs.get(i);
+                    if (key == null) {
+                        continue;
+                    }
+                    if (map.remove(key) != null) {
+                        removedEntries++;
+                    }
+                }
+
+                ctx.writeAndFlush(new IntegerRedisMessage(removedEntries));
+                break;
+            }
             case "SHUTDOWN":
                 ctx.writeAndFlush(new SimpleStringRedisMessage("OK"))
                    .addListener((ChannelFutureListener) f -> {
@@ -70,6 +143,14 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
             default:
                 reject(ctx, "ERR Unsupported command");
         }
+    }
+
+    private static void rejectNilValue(final ChannelHandlerContext ctx) {
+        reject(ctx, "ERR A nil value is not allowed");
+    }
+
+    private static void rejectNilKey(final ChannelHandlerContext ctx) {
+        reject(ctx, "ERR A nil key is not allowed");
     }
 
     private void rejectMalformedRequest(final ChannelHandlerContext ctx) {
