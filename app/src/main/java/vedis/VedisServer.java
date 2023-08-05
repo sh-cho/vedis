@@ -1,10 +1,12 @@
 package vedis;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.redis.RedisDecoder;
+import io.netty.handler.codec.redis.RedisEncoder;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -12,20 +14,30 @@ public class VedisServer {
 
     public static final int PORT = Integer.parseInt(System.getProperty("port", "6379"));
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         final EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         final EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        // it becomes zero when received `shutdown` command
         final CountDownLatch shutdownLatch = new CountDownLatch(1);
         try {
             final ServerBootstrap b = new ServerBootstrap();
+            b.channel(NioServerSocketChannel.class);
             b.group(bossGroup, workerGroup);
-            b.handler(new ChannelInitializer<SocketChannel>() {
+            b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
-
+                    final ChannelPipeline p = ch.pipeline();
+                    p.addLast(new RedisDecoder());
+                    p.addLast(new RedisEncoder());
+                    p.addLast(new VedisServerHandler(shutdownLatch));
                 }
             });
-            b.bind(PORT).sync();
+            final Channel ch = b.bind(PORT).sync().channel();
+            System.err.println("Redis server listening at " + ch.localAddress());
+
+            // wait until the latch becomes zero
+            shutdownLatch.await();
         } finally {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
