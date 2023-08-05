@@ -5,6 +5,8 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.redis.RedisArrayAggregator;
+import io.netty.handler.codec.redis.RedisBulkStringAggregator;
 import io.netty.handler.codec.redis.RedisDecoder;
 import io.netty.handler.codec.redis.RedisEncoder;
 
@@ -29,6 +31,8 @@ public class VedisServer {
                 protected void initChannel(SocketChannel ch) throws Exception {
                     final ChannelPipeline p = ch.pipeline();
                     p.addLast(new RedisDecoder());
+                    p.addLast(new RedisBulkStringAggregator());
+                    p.addLast(new RedisArrayAggregator());
                     p.addLast(new RedisEncoder());
                     p.addLast(new VedisServerHandler(shutdownLatch));
                 }
