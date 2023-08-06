@@ -1,5 +1,7 @@
 # Vedis
 
+[![CI](https://github.com/sh-cho/vedis/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/sh-cho/vedis/actions/workflows/ci.yml)
+
 > [!NOTE]
 > This project is just for study. It is not intended to be used in production. :)
 
