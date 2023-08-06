@@ -16,15 +16,5 @@ class VedisServerTest {
     void tearDown() {
     }
 
-    @Test
-    void xFail() {
-        // Dummy to check CI.
-        throw new RuntimeException("Dummy");
-    }
 
-    @Test
-    void goingToSuccess() {
-        // Dummy to check CI.
-        assertTrue(true);
-    }
 }
