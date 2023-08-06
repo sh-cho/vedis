@@ -54,24 +54,14 @@ public class VedisServerHandler extends ChannelInboundHandlerAdapter {
             System.err.println(ctx.channel() + " RCVD: " + strArgs);
 
             switch (command) {
-                case "COMMAND":  // dummy response
-                    ctx.writeAndFlush(ArrayRedisMessage.EMPTY_INSTANCE);
-                    break;
-                case "GET":
-                    handleGet(ctx, strArgs);
-                    break;
-                case "SET":
-                    handleSet(ctx, strArgs);
-                    break;
-                case "DEL":
-                    handleDel(ctx, strArgs);
-                    break;
-                case "SHUTDOWN":
-                    ctx.writeAndFlush(new SimpleStringRedisMessage("OK"))
-                       .addListener((ChannelFutureListener) f -> shutdownLatch.countDown());
-                    break;
-                default:
-                    reject(ctx, "ERR Unsupported command");
+                case "COMMAND" ->  // dummy response
+                        ctx.writeAndFlush(ArrayRedisMessage.EMPTY_INSTANCE);
+                case "GET" -> handleGet(ctx, strArgs);
+                case "SET" -> handleSet(ctx, strArgs);
+                case "DEL" -> handleDel(ctx, strArgs);
+                case "SHUTDOWN" -> ctx.writeAndFlush(new SimpleStringRedisMessage("OK"))
+                                      .addListener((ChannelFutureListener) f -> shutdownLatch.countDown());
+                default -> reject(ctx, "ERR Unsupported command");
             }
         } finally {
             ReferenceCountUtil.release(msg);
